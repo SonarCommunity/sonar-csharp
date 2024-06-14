@@ -63,11 +63,11 @@ namespace SonarAnalyzer.Rules.CSharp
                     var methodDeclaration = MethodDeclarationFactory.Create(c.Node);
                     if (!methodDeclaration.Identifier.IsMissing
                         && methodDeclaration.HasImplementation
-                        && c.SemanticModel.GetDeclaredSymbol(c.Node) is IMethodSymbol methodSymbol
-                        && IsTestMethod(methodSymbol, methodDeclaration.IsLocal)
-                        && !methodSymbol.HasExpectedExceptionAttribute()
-                        && !methodSymbol.HasAssertionInAttribute()
-                        && !IsTestIgnored(methodSymbol)
+                        && c.SemanticModel.GetDeclaredSymbol(c.Node) is IMethodSymbol method
+                        && method.IsTestMethod()
+                        && !method.HasExpectedExceptionAttribute()
+                        && !method.HasAssertionInAttribute()
+                        && !method.IsIgnoredTestMethod()
                         && !ContainsAssertion(c.Node, c.SemanticModel, new HashSet<IMethodSymbol>(), 0))
                     {
                         c.ReportIssue(Rule, methodDeclaration.Identifier);
@@ -75,13 +75,6 @@ namespace SonarAnalyzer.Rules.CSharp
                 },
                 SyntaxKind.MethodDeclaration,
                 SyntaxKindEx.LocalFunctionStatement);
-
-        // only xUnit allows local functions to be test methods.
-        private static bool IsTestMethod(IMethodSymbol symbol, bool isLocalFunction) =>
-            isLocalFunction ? IsXunitTestMethod(symbol) : symbol.IsTestMethod();
-
-        private static bool IsXunitTestMethod(IMethodSymbol methodSymbol) =>
-            methodSymbol.AnyAttributeDerivesFromAny(UnitTestHelper.KnownTestMethodAttributesOfxUnit);
 
         private static bool ContainsAssertion(SyntaxNode methodDeclaration, SemanticModel previousSemanticModel, ISet<IMethodSymbol> visitedSymbols, int level)
         {
@@ -123,21 +116,6 @@ namespace SonarAnalyzer.Rules.CSharp
             }
 
             return false;
-        }
-
-        private static bool IsTestIgnored(IMethodSymbol method)
-        {
-            if (method.IsMsTestOrNUnitTestIgnored())
-            {
-                return true;
-            }
-
-            // Checking whether an Xunit test is ignore or not needs to be done at the syntax level i.e. language-specific
-            var factAttributeSyntax = method.FindXUnitTestAttribute()
-                ?.ApplicationSyntaxReference.GetSyntax() as AttributeSyntax;
-
-            return factAttributeSyntax?.ArgumentList != null
-                 && factAttributeSyntax.ArgumentList.Arguments.Any(x => x.NameEquals.Name.Identifier.ValueText == "Skip");
         }
 
         private static bool IsAssertion(InvocationExpressionSyntax invocation) =>
