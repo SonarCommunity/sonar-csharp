@@ -55,7 +55,6 @@ namespace SonarAnalyzer.Test.Rules
         public void CognitiveComplexity_CS_CSharp10() =>
             builderCS.AddPaths("CognitiveComplexity.CSharp10.cs")
                 .WithOptions(ParseOptionsHelper.FromCSharp10)
-                .WithConcurrentAnalysis(false)
                 .Verify();
 
         [TestMethod]

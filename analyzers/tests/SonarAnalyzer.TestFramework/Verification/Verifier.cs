@@ -24,6 +24,8 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Google.Protobuf;
 using Microsoft.CodeAnalysis.CodeFixes;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.CSharp;
 using SonarAnalyzer.Rules;
 using SonarAnalyzer.TestFramework.Build;
 
@@ -229,13 +231,44 @@ internal class Verifier
     {
         return language.LanguageName switch
         {
-            LanguageNames.CSharp => $"namespace AppendedNamespaceForConcurrencyTest {{ {content} {Environment.NewLine}}}",  // Last line can be a comment
+            LanguageNames.CSharp => EncloseInNamespace(content),
             LanguageNames.VisualBasic => content.Insert(ImportsIndexVB(), "Namespace AppendedNamespaceForConcurrencyTest : ") + Environment.NewLine + " : End Namespace",
             _ => throw new UnexpectedLanguageException(language)
         };
 
         int ImportsIndexVB() =>
             ImportsRegexVB.Match(content) is { Success: true } match ? match.Index + match.Length + 1 : 0;
+    }
+
+    private static string EncloseInNamespace(string content)
+    {
+        var tree = CSharpSyntaxTree.ParseText(content);
+        if (tree.TryGetRoot(out var root) && root is CompilationUnitSyntax { Members: { } members } compilationUnit)
+        {
+            if (members.OfType<FileScopedNamespaceDeclarationSyntax>().FirstOrDefault() is { } fileScoped)
+            {
+                root = root.ReplaceNode(fileScoped, fileScoped.WithName(SyntaxFactory.ParseName($"ConcurrencyTest.{fileScoped.Name}")));
+            }
+            else
+            {
+                var newNamespace = SyntaxFactory.NamespaceDeclaration(SyntaxFactory.ParseName(" AppendedNamespaceForConcurrencyTest"))
+                    .WithMembers(compilationUnit.Members)
+                    .WithCloseBraceToken(SyntaxFactory.Token(SyntaxKind.CloseBraceToken).WithLeadingTrivia(SyntaxFactory.Whitespace("\n")));
+                if (newNamespace.Members.Any() && newNamespace.Members[0] is NamespaceDeclarationSyntax)
+                {
+                    // Move the leading trivia of the first member to newNamespace
+                    newNamespace = newNamespace.WithLeadingTrivia(newNamespace.Members[0].GetLeadingTrivia());
+                    newNamespace = newNamespace.WithMembers(newNamespace.Members.Replace(newNamespace.Members[0], newNamespace.Members[0].WithoutLeadingTrivia()));
+                }
+                root = compilationUnit.WithMembers(SyntaxFactory.List<MemberDeclarationSyntax>(new[] { newNamespace }));
+            }
+
+            return root.ToFullString();
+        }
+        else
+        {
+            return $"namespace AppendedNamespaceForConcurrencyTest {{ {content} {Environment.NewLine}}}";
+        }
     }
 
     private string TestCaseDirectory() =>

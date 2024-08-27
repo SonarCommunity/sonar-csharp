@@ -87,7 +87,6 @@ namespace SonarAnalyzer.Test.Rules
             .AddAnalyzer(createConfiguredAnalyzer)
             .WithOnlyDiagnostics(onlyDiagnostics)
             .AddReferences(MetadataReferenceFacade.SystemThreading)
-            .WithBasePath(@"SymbolicExecution\Roslyn")
-            .WithConcurrentAnalysis(false);
+            .WithBasePath(@"SymbolicExecution\Roslyn");
     }
 }

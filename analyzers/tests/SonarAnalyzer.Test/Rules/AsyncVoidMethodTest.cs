@@ -60,7 +60,6 @@ namespace SonarAnalyzer.Test.Rules
                 // The first version of the framework is not compatible with Net 7 so we need to test only v2 with C#11 features
                 .WithOptions(ParseOptionsHelper.FromCSharp11)
                 .AddReferences(NuGetMetadataReference.MSTestTestFramework(testFwkVersion))
-                .WithConcurrentAnalysis(false)
                 .Verify();
 
 #endif

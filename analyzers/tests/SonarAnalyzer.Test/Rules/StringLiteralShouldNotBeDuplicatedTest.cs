@@ -86,7 +86,6 @@ namespace SonarAnalyzer.Test.Rules
         public void StringLiteralShouldNotBeDuplicated_Attributes_CS() =>
             new VerifierBuilder().AddAnalyzer(() => new CS.StringLiteralShouldNotBeDuplicated { Threshold = 2 })
                 .AddPaths("StringLiteralShouldNotBeDuplicated_Attributes.cs")
-                .WithConcurrentAnalysis(false)
                 .Verify();
 
         [TestMethod]

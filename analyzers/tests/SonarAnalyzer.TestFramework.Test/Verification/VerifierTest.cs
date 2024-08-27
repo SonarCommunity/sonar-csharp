@@ -496,7 +496,7 @@ public class VerifierTest
         // Concurrent analysis by-default automatically generates concurrent files - File.Concurrent.cs
         builder.Invoking(x => x.Verify()).Should().Throw<DiagnosticVerifierException>().WithMessage("""
             There are differences for CSharp7 File.Concurrent.cs:
-              Line 1: Missing expected issue
+              Line 2: Missing expected issue
 
             There are differences for CSharp7 File.cs:
               Line 1: Missing expected issue

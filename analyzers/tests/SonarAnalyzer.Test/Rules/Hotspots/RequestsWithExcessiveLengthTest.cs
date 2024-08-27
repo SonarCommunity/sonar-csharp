@@ -65,7 +65,6 @@ namespace SonarAnalyzer.Test.Rules
         public void RequestsWithExcessiveLength_Csharp11() =>
             builderCS
                 .AddPaths(@"RequestsWithExcessiveLength.CSharp11.cs")
-                .WithConcurrentAnalysis(false)
                 .WithOptions(ParseOptionsHelper.FromCSharp11).Verify();
 
 #endif

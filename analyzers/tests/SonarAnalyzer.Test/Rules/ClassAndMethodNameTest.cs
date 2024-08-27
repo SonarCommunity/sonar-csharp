@@ -32,7 +32,6 @@ namespace SonarAnalyzer.Test.Rules
         public void ClassAndMethodName_CS() =>
             builderCS.AddPaths("ClassAndMethodName.cs", "ClassAndMethodName.Partial.cs")
                 .AddReferences(MetadataReferenceFacade.NetStandard21)
-                .WithConcurrentAnalysis(false)
                 .WithOptions(ParseOptionsHelper.FromCSharp8)
                 .Verify();
 

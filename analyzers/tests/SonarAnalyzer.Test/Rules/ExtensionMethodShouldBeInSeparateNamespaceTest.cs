@@ -43,7 +43,6 @@ namespace SonarAnalyzer.Test.Rules
         public void ExtensionMethodShouldBeInSeparateNamespace_CSharp10() =>
             builder
                 .AddPaths("ExtensionMethodShouldBeInSeparateNamespace.CSharp10.cs")
-                .WithConcurrentAnalysis(false)
                 .WithOptions(ParseOptionsHelper.FromCSharp10)
                 .Verify();
 
