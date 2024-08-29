@@ -1,6 +1,6 @@
 ﻿/*
  * SonarAnalyzer for .NET
- * Copyright (C) 2015-2024 SonarSource SA
+ * Copyright (C) 2015-2023 SonarSource SA
  * mailto: contact AT sonarsource DOT com
  *
  * This program is free software; you can redistribute it and/or
@@ -18,24 +18,31 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+using System.Text.RegularExpressions;
 using SonarAnalyzer.RegularExpressions;
 
 namespace SonarAnalyzer.Rules;
 
-public abstract class RegexMustHaveValidSyntaxBase<TSyntaxKind> : RegexAnalyzerBase<TSyntaxKind>
+public abstract class RegexShouldNotContainMultipleSpacesBase<TSyntaxKind> : RegexAnalyzerBase<TSyntaxKind>
     where TSyntaxKind : struct
 {
-    private const string DiagnosticId = "S5856";
+    private const string DiagnosticId = "S101";
 
-    protected sealed override string MessageFormat => "Fix the syntax error inside this regex: {0}";
+    protected sealed override string MessageFormat => "Regular expressions should not contain multiple spaces.";
 
-    protected RegexMustHaveValidSyntaxBase() : base(DiagnosticId) { }
+    protected RegexShouldNotContainMultipleSpacesBase() : base(DiagnosticId) { }
 
     protected sealed override void Analyze(SonarSyntaxNodeReportingContext context, RegexContext regexContext)
     {
-        if (regexContext?.ParseError is { } error)
+        if (regexContext?.Regex is not null
+            && !IgnoresPatternWhitespace(regexContext)
+            && regexContext.Pattern.Contains("  "))
         {
-            context.ReportIssue(Rule, regexContext.PatternNode, error.Message);
+            context.ReportIssue(Diagnostic.Create(Rule, regexContext.PatternNode.GetLocation()));
         }
     }
+
+    private bool IgnoresPatternWhitespace(RegexContext context) =>
+        context.Options is { } options
+        && options.HasFlag(RegexOptions.IgnorePatternWhitespace);
 }

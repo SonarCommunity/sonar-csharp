@@ -22,18 +22,19 @@ using System.Text.RegularExpressions;
 
 namespace SonarAnalyzer.RegularExpressions;
 
-internal sealed class RegexContext
+[DebuggerDisplay("Pattern = {Pattern}, Options = {Options}")]
+public sealed class RegexContext
 {
     private static readonly RegexOptions ValidationMask = (RegexOptions)int.MaxValue ^ RegexOptions.Compiled;
 
-    private static readonly string[] MatchMethods = new[]
-    {
+    private static readonly string[] MatchMethods =
+    [
         nameof(Regex.IsMatch),
         nameof(Regex.Match),
         nameof(Regex.Matches),
         nameof(Regex.Replace),
         nameof(Regex.Split),
-    };
+    ];
 
     public SyntaxNode PatternNode { get; }
     public string Pattern { get; }
@@ -102,8 +103,13 @@ internal sealed class RegexContext
             pattern,
             language.FindConstantValue(model, pattern) as string,
             options,
-            language.FindConstantValue(model, options) is RegexOptions value ? value : null);
+            FindRegexOptions(language, model, options));
     }
+
+    private static RegexOptions? FindRegexOptions<TSyntaxKind>(ILanguageFacade<TSyntaxKind> language, SemanticModel model, SyntaxNode options) where TSyntaxKind : struct =>
+        language.FindConstantValue(model, options) is int constant
+            ? (RegexOptions)constant
+            : null;
 
     private static SyntaxNode TryGetNonParamsSyntax(IMethodSymbol method, IMethodParameterLookup parameters, string paramName) =>
         method.Parameters.SingleOrDefault(x => x.Name == paramName) is { } param

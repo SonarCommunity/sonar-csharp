@@ -1,6 +1,6 @@
 ﻿/*
  * SonarAnalyzer for .NET
- * Copyright (C) 2015-2024 SonarSource SA
+ * Copyright (C) 2015-2023 SonarSource SA
  * mailto: contact AT sonarsource DOT com
  *
  * This program is free software; you can redistribute it and/or
@@ -18,24 +18,10 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-using SonarAnalyzer.RegularExpressions;
+namespace SonarAnalyzer.Rules.VisualBasic;
 
-namespace SonarAnalyzer.Rules;
-
-public abstract class RegexMustHaveValidSyntaxBase<TSyntaxKind> : RegexAnalyzerBase<TSyntaxKind>
-    where TSyntaxKind : struct
+[DiagnosticAnalyzer(LanguageNames.VisualBasic)]
+public sealed class RegexShouldNotContainMultipleSpaces : RegexShouldNotContainMultipleSpacesBase<SyntaxKind>
 {
-    private const string DiagnosticId = "S5856";
-
-    protected sealed override string MessageFormat => "Fix the syntax error inside this regex: {0}";
-
-    protected RegexMustHaveValidSyntaxBase() : base(DiagnosticId) { }
-
-    protected sealed override void Analyze(SonarSyntaxNodeReportingContext context, RegexContext regexContext)
-    {
-        if (regexContext?.ParseError is { } error)
-        {
-            context.ReportIssue(Rule, regexContext.PatternNode, error.Message);
-        }
-    }
+    protected override ILanguageFacade<SyntaxKind> Language => VisualBasicFacade.Instance;
 }
