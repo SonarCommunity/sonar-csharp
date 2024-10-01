@@ -35,7 +35,6 @@ namespace SonarAnalyzer.Rules
     {
         protected static readonly ISet<string> FileExtensionWhitelist = new HashSet<string> { ".cs", ".csx", ".vb" };
         private readonly DiagnosticDescriptor rule;
-        protected override bool EnableConcurrentExecution => false;
 
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
             ImmutableArray.Create(rule);
@@ -98,26 +97,47 @@ namespace SonarAnalyzer.Rules
                 {
                     return;
                 }
-                var treeMessages = new ConcurrentStack<TMessage>();
+                var cancel = startContext.Cancel;
+                var outPath = parameters.OutPath;
+                var treeMessages = new BlockingCollection<TMessage>();
+                var consumerTask = Task.Factory.StartNew(() =>
+                {
+                    // Consume all messages as they arrive during the compilation and write them to disk.
+                    // The Task starts on CompilationStart and in CompilationEnd we block until it is finished via CompleteAdding().
+                    // Note: CompilationEndAction is not guaranteed to be called for each CompilationStart.
+                    // Therefore it is important to properly handle cancelation here.
+                    // LongRunning: We probably run on a dedicated thread outside of the thread pool
+                    // If any of the IO operations throw, CompilationEnd takes care of the clean up.
+                    Directory.CreateDirectory(outPath);
+                    using var stream = File.Create(Path.Combine(outPath, FileName));
+                    foreach (var message in treeMessages.GetConsumingEnumerable(cancel).WhereNotNull())
+                    {
+                        message.WriteDelimitedTo(stream);
+                    }
+                }, cancel, TaskCreationOptions.LongRunning, TaskScheduler.Default);
                 startContext.RegisterSemanticModelAction(modelContext =>
                 {
-                    if (ShouldGenerateMetrics(parameters, modelContext))
+                    if (ShouldGenerateMetrics(parameters, modelContext) && !cancel.IsCancellationRequested)
                     {
                         var message = CreateMessage(parameters, modelContext.Tree, modelContext.SemanticModel);
-                        treeMessages.Push(message);
+                        treeMessages.Add(message);
                     }
                 });
                 startContext.RegisterCompilationEndAction(endContext =>
                 {
-                    var allMessages = CreateAnalysisMessages(endContext)
-                        .Concat(treeMessages)
-                        .WhereNotNull()
-                        .ToArray();
-                    Directory.CreateDirectory(parameters.OutPath);
-                    using var stream = File.Create(Path.Combine(parameters.OutPath, FileName));
-                    foreach (var message in allMessages)
+                    var analysisMessages = CreateAnalysisMessages(endContext);
+                    foreach (var message in analysisMessages)
                     {
-                        message.WriteDelimitedTo(stream);
+                        treeMessages.Add(message);
+                    }
+                    treeMessages.CompleteAdding();
+                    try
+                    {
+                        consumerTask.Wait(cancel); // Wait until all messages are written to disk. Throws, if the task failed.
+                    }
+                    finally
+                    {
+                        treeMessages.Dispose();
                     }
                 });
             });
