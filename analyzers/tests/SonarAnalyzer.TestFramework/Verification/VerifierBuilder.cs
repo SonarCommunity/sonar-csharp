@@ -41,6 +41,7 @@ public record VerifierBuilder
     public string BasePath { get; init; }
     public Func<SonarCodeFix> CodeFix { get; init; }
     public string CodeFixedPath { get; init; }
+    public string CodeFixed { get; init; }
     public string CodeFixedPathBatch { get; init; }
     public string CodeFixTitle { get; init; }
     public bool ConcurrentAnalysis { get; init; } = true;
@@ -91,6 +92,9 @@ public record VerifierBuilder
     /// <param name="codeFixedPathBatch">Fixed file for cases when FixAllProvider produces different results than applying all code fixes on the same original document.</param>
     public VerifierBuilder WithCodeFixedPaths(string codeFixedPath, string codeFixedPathBatch = null) =>
         this with { CodeFixedPath = codeFixedPath, CodeFixedPathBatch = codeFixedPathBatch };
+
+    public VerifierBuilder WithCodeFixedSnippet(string codeFixed) =>
+        this with { CodeFixed = codeFixed };
 
     public VerifierBuilder WithCodeFixTitle(string codeFixTitle) =>
         this with { CodeFixTitle = codeFixTitle };

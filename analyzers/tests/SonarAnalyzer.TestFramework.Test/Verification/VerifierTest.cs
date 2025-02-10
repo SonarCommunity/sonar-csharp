@@ -33,6 +33,10 @@ public class VerifierTest
         .AddPaths("Path.cs")
         .WithCodeFix<DummyCodeFixCS>()
         .WithCodeFixedPaths("Expected.cs");
+    private static readonly VerifierBuilder DummySnippetCodeFixCS = new VerifierBuilder<DummyAnalyzerCS>()
+        .AddSnippet("class C { }")
+        .WithCodeFix<DummyCodeFixCS>()
+        .WithCodeFixedSnippet("class C { }");
 
     private static readonly VerifierBuilder DummyWithLocation = new VerifierBuilder<DummyAnalyzerWithLocation>();
 
@@ -68,9 +72,24 @@ public class VerifierTest
             .Invoking(x => x.Build()).Should().Throw<ArgumentException>().WithMessage("Path 'File.txt' doesn't match C# file extension '.cs'.");
 
     [TestMethod]
-    public void Constructor_CodeFix_MissingCodeFixedPath_Throws() =>
+    public void Constructor_CodeFix_MissingCodeFixed_Throws() =>
         DummyCodeFixCS.WithCodeFixedPaths(null)
-            .Invoking(x => x.Build()).Should().Throw<ArgumentException>().WithMessage("CodeFixedPath was not set.");
+            .Invoking(x => x.Build()).Should().Throw<ArgumentException>().WithMessage("Either CodeFixedPath or CodeFixed must be specified.");
+
+    [TestMethod]
+    public void Constructor_CodeFix_FixedSnippetAndFixedPath_Throws() =>
+        DummyCodeFixCS.WithCodeFixedSnippet("Wrong")
+            .Invoking(x => x.Build()).Should().Throw<ArgumentException>().WithMessage("Either CodeFixedPath or CodeFixed must be specified, but not both.");
+
+    [TestMethod]
+    public void Constructor_CodeFix_ActualPath_FixedSnippet_DoesNotThrow() =>
+        DummyCodeFixCS.WithCodeFixedPaths(null).WithCodeFixedSnippet("OK")
+            .Invoking(x => x.Build()).Should().NotThrow();
+
+    [TestMethod]
+    public void Constructor_CodeFix_ActualSnippet_FixedPath_DoesNotThrow() =>
+        DummySnippetCodeFixCS.WithCodeFixedSnippet(null).WithCodeFixedPaths("File.cs")
+            .Invoking(x => x.Build()).Should().NotThrow();
 
     [TestMethod]
     public void Constructor_CodeFix_WrongCodeFixedPath_Throws() =>
@@ -93,9 +112,27 @@ public class VerifierTest
             .Invoking(x => x.Build()).Should().Throw<ArgumentException>().WithMessage("Paths must contain only 1 file, but 3 were found.");
 
     [TestMethod]
-    public void Constructor_CodeFix_WithSnippets_Throws() =>
+    public void Constructor_CodeFix_SnippetAndPath_Throws() =>
         DummyCodeFixCS.AddSnippet("Wrong")
-            .Invoking(x => x.Build()).Should().Throw<ArgumentException>().WithMessage("Snippets must be empty when CodeFix is set.");
+            .Invoking(x => x.Build()).Should().Throw<ArgumentException>().WithMessage("Either Paths or Snippets must be specified, but not both.");
+
+    [TestMethod]
+    public void Constructor_CodeFix_NoSnippetAndPath_Throws() =>
+        new VerifierBuilder<DummyAnalyzerCS>().WithCodeFix<DummyCodeFixCS>().WithCodeFixedSnippet("OK")
+            .Invoking(x => x.Build()).Should().Throw<ArgumentException>().WithMessage("Paths cannot be empty. Add at least one file using builder.AddPaths() or AddSnippet().");
+
+    [TestMethod]
+    public void Constructor_CodeFix_WithSinglePath_DoesNotThrow() =>
+        DummyCodeFixCS.Invoking(x => x.Build()).Should().NotThrow();
+
+    [TestMethod]
+    public void Constructor_CodeFix_WithSingleSnippets_DoesNotThrow() =>
+        DummySnippetCodeFixCS.Invoking(x => x.Build()).Should().NotThrow();
+
+    [TestMethod]
+    public void Constructor_CodeFix_WithMoreSnippets_Throws() =>
+        DummySnippetCodeFixCS.AddSnippet("Second").AddSnippet("Third")
+            .Invoking(x => x.Build()).Should().Throw<ArgumentException>().WithMessage("Snippets must contain only 1 snippet, but 3 were found.");
 
     [TestMethod]
     public void Constructor_CodeFix_WrongLanguage_Throws() =>

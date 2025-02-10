@@ -143,15 +143,32 @@ internal class Verifier
     public void VerifyCodeFix()     // This should never have any arguments
     {
         _ = codeFix ?? throw new InvalidOperationException($"{nameof(builder.CodeFix)} was not set.");
-        var document = CreateProject(false).FindDocument(Path.Combine(builder.BasePath ?? string.Empty, Path.GetFileName(builder.Paths.Single())));
+        var project = CreateProject(false);
+        var document = builder.Paths.Any()
+            ? project.FindDocument(Path.Combine(builder.BasePath ?? string.Empty, Path.GetFileName(builder.Paths.Single())))
+            : project.Project.Documents.Single();
         var codeFixVerifier = new CodeFixVerifier(analyzers.Single(), codeFix, document, builder.CodeFixTitle);
         var fixAllProvider = codeFix.GetFixAllProvider();
         foreach (var parseOptions in builder.ParseOptions.OrDefault(language.LanguageName))
         {
-            codeFixVerifier.VerifyWhileDocumentChanges(parseOptions, TestCasePath(builder.CodeFixedPath));
-            if (fixAllProvider is not null)
+            switch (builder)
             {
-                codeFixVerifier.VerifyFixAllProvider(fixAllProvider, parseOptions, TestCasePath(builder.CodeFixedPathBatch ?? builder.CodeFixedPath));
+                case { CodeFixedPath: { } path }:
+                    codeFixVerifier.VerifyWhileDocumentChanges(parseOptions, new FileInfo(TestCasePath(path)));
+                    if (fixAllProvider is not null)
+                    {
+                        codeFixVerifier.VerifyFixAllProvider(fixAllProvider, parseOptions, new FileInfo(TestCasePath(builder.CodeFixedPathBatch ?? builder.CodeFixedPath)));
+                    }
+                    break;
+                case { CodeFixed: { } fixedCode }:
+                    codeFixVerifier.VerifyWhileDocumentChanges(parseOptions, fixedCode);
+                    if (fixAllProvider is not null)
+                    {
+                        codeFixVerifier.VerifyFixAllProvider(fixAllProvider, parseOptions, fixedCode);
+                    }
+                    break;
+                default:
+                    throw new InvalidOperationException($"No fixed code found. Specify {nameof(builder.CodeFixedPath)} or {nameof(builder.CodeFixed)}.");
             }
         }
     }
@@ -268,17 +285,25 @@ internal class Verifier
 
     private void ValidateCodeFix()
     {
-        _ = builder.CodeFixedPath ?? throw new ArgumentException($"{nameof(builder.CodeFixedPath)} was not set.");
         ValidateSingleAnalyzer(nameof(builder.CodeFix));
-        if (builder.Paths.Length != 1)
+        switch (builder)
         {
-            throw new ArgumentException($"{nameof(builder.Paths)} must contain only 1 file, but {builder.Paths.Length} were found.");
+            case { Paths.Length: > 1 }:
+                throw new ArgumentException($"{nameof(builder.Paths)} must contain only 1 file, but {builder.Paths.Length} were found.");
+            case { Snippets.Length: > 1 }:
+                throw new ArgumentException($"{nameof(builder.Snippets)} must contain only 1 snippet, but {builder.Snippets.Length} were found.");
+            case { Paths.Length: 1, Snippets.Length: 1 }:
+                throw new ArgumentException($"Either {nameof(builder.Paths)} or {nameof(builder.Snippets)} must be specified, but not both.");
+            case { Paths.Length: 0, Snippets.Length: 0 }:
+                throw new ArgumentException($"Either {nameof(builder.Paths)} or {nameof(builder.Snippets)} must contain a single item, but both were empty.");
+            case { CodeFixedPath: null, CodeFixed: null }:
+                throw new ArgumentException($"Either {nameof(builder.CodeFixedPath)} or {nameof(builder.CodeFixed)} must be specified.");
+            case { CodeFixedPath: not null, CodeFixed: not null }:
+                throw new ArgumentException($"Either {nameof(builder.CodeFixedPath)} or {nameof(builder.CodeFixed)} must be specified, but not both.");
+            case { CodeFixedPath: { } codeFixPath}:
+                ValidateExtension(codeFixPath);
+                break;
         }
-        if (builder.Snippets.Any())
-        {
-            throw new ArgumentException($"{nameof(builder.Snippets)} must be empty when {nameof(builder.CodeFix)} is set.");
-        }
-        ValidateExtension(builder.CodeFixedPath);
         if (builder.CodeFixedPathBatch is not null)
         {
             ValidateExtension(builder.CodeFixedPathBatch);

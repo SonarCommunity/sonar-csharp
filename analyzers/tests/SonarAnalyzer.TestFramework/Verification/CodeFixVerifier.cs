@@ -37,7 +37,10 @@ internal class CodeFixVerifier
         this.codeFixTitle = codeFixTitle;
     }
 
-    public void VerifyWhileDocumentChanges(ParseOptions parseOptions, string pathToExpected)
+    public void VerifyWhileDocumentChanges(ParseOptions parseOptions, FileInfo pathToExpected) =>
+        VerifyWhileDocumentChanges(parseOptions, File.ReadAllText(pathToExpected.FullName));
+
+    public void VerifyWhileDocumentChanges(ParseOptions parseOptions, string expectedCode)
     {
         var state = new State(analyzer, originalDocument, parseOptions);
         var codeFixExecuted = false;
@@ -58,10 +61,13 @@ internal class CodeFixVerifier
         while (codeBeforeFix != state.ActualCode);
 
         codeFixExecuted.Should().BeTrue();
-        state.AssertExpected(pathToExpected, nameof(VerifyWhileDocumentChanges) + " updates the document until all issues are fixed, even if the fix itself creates a new issue again");
+        state.AssertExpected(expectedCode, nameof(VerifyWhileDocumentChanges) + " updates the document until all issues are fixed, even if the fix itself creates a new issue again");
     }
 
-    public void VerifyFixAllProvider(FixAllProvider fixAllProvider, ParseOptions parseOptions, string pathToExpected)
+    public void VerifyFixAllProvider(FixAllProvider fixAllProvider, ParseOptions parseOptions, FileInfo pathToExpected) =>
+        VerifyFixAllProvider(fixAllProvider, parseOptions, File.ReadAllText(pathToExpected.FullName));
+
+    public void VerifyFixAllProvider(FixAllProvider fixAllProvider, ParseOptions parseOptions, string expectedCode)
     {
         var state = new State(analyzer, originalDocument, parseOptions);
         state.Diagnostics.Should().NotBeEmpty();
@@ -73,7 +79,7 @@ internal class CodeFixVerifier
         codeActionToExecute.Should().NotBeNull();
 
         new State(analyzer, ApplyCodeFix(state.Document, codeActionToExecute), parseOptions)
-            .AssertExpected(pathToExpected, $"{nameof(VerifyFixAllProvider)} runs {fixAllProvider.GetType().Name} once");
+            .AssertExpected(expectedCode, $"{nameof(VerifyFixAllProvider)} runs {fixAllProvider.GetType().Name} once");
     }
 
     private string CodeFixTitle(CodeFixProvider codeFix, State state) =>
@@ -111,11 +117,8 @@ internal class CodeFixVerifier
             ActualCode = document.GetSyntaxRootAsync().Result.GetText().ToString();
         }
 
-        public void AssertExpected(string pathToExpected, string becauseMessage)
-        {
-            var expected = File.ReadAllText(pathToExpected).ToUnixLineEndings();
-            ActualCodeWithReplacedComments().ToUnixLineEndings().Should().Be(expected, $"{becauseMessage}. Language: {compilation.LanguageVersionString()}");
-        }
+        public void AssertExpected(string expectedCode, string becauseMessage) =>
+            ActualCodeWithReplacedComments().ToUnixLineEndings().Should().Be(expectedCode, $"{becauseMessage}. Language: {compilation.LanguageVersionString()}");
 
         private string ActualCodeWithReplacedComments() =>
             ActualCode.ToUnixLineEndings()
